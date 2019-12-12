@@ -1,11 +1,11 @@
 "use strict";
 
-var fs = require("fs");
-var path = require("path");
+var fs 				= require("fs");
+var path 			= require("path");
 var Sequelize = require("sequelize");
-var env = process.env.NODE_ENV || "development";
-var config = require('../config/config')
-var db = {};
+var env 	 		= process.env.NODE_ENV || "development";
+var config 		= require('../config')
+var db 				= {};
 var sequelize = new Sequelize(config.db.database, config.db.username, config.db.password, config.db.options);
 
 

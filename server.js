@@ -2,21 +2,21 @@
 const { check, validationResult } = require('express-validator');
 const bodyParser = require('body-parser');
 const express 	 = require('express');
-const models 		 = require('./db/db');
+const models 		 = require('./server/db/db');
 const cors  	 	 = require('cors')
 const mysql 	 	 = require('mysql');
 const bcrypt 		 = require('bcryptjs');
 const jwt 		 	 = require("jsonwebtoken");
-const passport 	 = require("passport");
-const LocalStrategy = require('passport-local').Strategy;
+const passport 	 	 = require("passport");
+const LocalStrategy  = require('passport-local').Strategy;
 const config 			 	= require('./config');
 const middleware 	 	= require('./middleware');
 const jwtDecode 		= require('jwt-decode');
 const blacklist 		= require('express-jwt-blacklist');
-const {sequelize}		= require('./models/index');
+const {sequelize}		= require('./server/models/index');
 
-const app 		 	 = express();
-var salt 				 = bcrypt.genSaltSync(10);
+const app 		 	 	= express();
+var salt 				= bcrypt.genSaltSync(10);
 app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({extended: false}));
 app.use(cors());

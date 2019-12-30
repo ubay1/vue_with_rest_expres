@@ -9,17 +9,17 @@
 #belum menggunakan sequelize
 
 
-#copy sql to database
-copas sql ke database
-
-#login system
-login dengan email: ubay00804@gmail.com, pass:ubay123
-
 # install dependencies
 npm install
 
 # Run server and client
 npm run go
+
+# Only Run Server
+npm run server
+
+# Only run Client
+npm run dev
 
 # build for production with minification
 npm run build

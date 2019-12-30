@@ -1,0 +1,28 @@
+{
+
+	"development": {
+		"username": "postgres",
+		"password": "secret",
+		"database": "vue_sequelize",
+		"host": "127.0.0.1",
+		"dialect": "postgres"
+	},
+
+	"test": {
+		"username": "postgres",
+		"password": "secret",
+		"database": "vue_sequelize",
+		"host": "127.0.0.1",
+		"dialect": "postgres"
+
+	},
+
+	"production": {
+		"username": "postgres",
+		"password": "secret",
+		"database": "vue_sequelize",
+		"host": "127.0.0.1",
+		"dialect": "postgres"
+	}
+
+}

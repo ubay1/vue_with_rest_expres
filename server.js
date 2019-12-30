@@ -1,19 +1,22 @@
 // node Backend Server
+// const models 		 = require('./server/db/db');
 const { check, validationResult } = require('express-validator');
-const bodyParser = require('body-parser');
-const express 	 = require('express');
-const models 		 = require('./server/db/db');
-const cors  	 	 = require('cors')
+const bodyParser 	 = require('body-parser');
+const express 	 	 = require('express');
+const cors  	 	 = require('cors');
+const queryDB 		 = require('./server/db/db');
 const mysql 	 	 = require('mysql');
+const {Pool, Client} = require('pg');
 const bcrypt 		 = require('bcryptjs');
 const jwt 		 	 = require("jsonwebtoken");
 const passport 	 	 = require("passport");
 const LocalStrategy  = require('passport-local').Strategy;
-const config 			 	= require('./config');
+const config 			= require('./config');
 const middleware 	 	= require('./middleware');
 const jwtDecode 		= require('jwt-decode');
 const blacklist 		= require('express-jwt-blacklist');
 const {sequelize}		= require('./server/models/index');
+const userController 	= require('./server/controllers/index');
 
 const app 		 	 	= express();
 var salt 				= bcrypt.genSaltSync(10);
@@ -21,20 +24,32 @@ app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({extended: false}));
 app.use(cors());
 
-// Connect to the database
-var conn = mysql.createConnection(models.mysql);
+const pool = new Pool ({
+    host: "localhost",
+    user: "postgres",
+    password: "secret",
+    port: 5432,
+    database: "vue_sequelize"
+  });
 
-//connect to database
-conn.connect((err) =>{
-  if(err){
-		console.log('ett error gajelas but is work');
-	};
-  console.log('Mysql Connected...');
-});
+// Connect to the database mysql
+// var conn = mysql.createConnection(models.mysql);
+
+//connect to database mysql
+// conn.connect((err) =>{
+//   if(err){
+	// 		console.log('ett error gajelas but is work');
+// 	};
+//   console.log('Mysql Connected...');
+// });
 
 // date now
 var date = new Date();
 var datee = date.toLocaleString();
+
+// ==== test SEQUELIZE ====\\
+	app.get('/api/userss', userController.getAllUser());  
+// ==== end SEQUELIZE ====\\
 
 // ====================================== API USER ====================================\\
 		// register user
@@ -42,23 +57,26 @@ var datee = date.toLocaleString();
 			check('username').not().isEmpty().withMessage('Username wajib diisi'),
 			check('email').not().isEmpty().withMessage('Email wajib diisi'),
 			check('password').not().isEmpty().withMessage('password wajib diisi'),
-			], (req, res) => {
+			], async (req, res) => {
 				const errors = validationResult(req);
 				if (!errors.isEmpty()) {
 					return res.status(422).json({ errors: errors.array() });
 				}
 
 				var body = {
+					roleid:3,
 					username: req.body.username,
 					email: req.body.email,
-					passwordhash: bcrypt.hashSync(req.body.password, salt)
+					passwordhash: bcrypt.hashSync(req.body.password, salt),
+					createdat : datee,
+					updatedat : datee,
 				};
 
-				console.log(body.username, body.email, body.passwordhash);
-
-				var cekemail = `SELECT * FROM users WHERE email = '${body.email}'`;
-				let qr = conn.query(cekemail, (err, results) => {
-					if (results.length > 0) {
+				console.log(body);
+				
+				// var query = `SELECT * FROM users WHERE email = '${body.email}'`;
+				var querycheckuser = await pool.query(`SELECT * FROM users WHERE email = '${body.email}'`);
+					if (querycheckuser.rows.length > 0) {
 						res.send({
 							data:{
 								message:'email sudah digunakan',
@@ -67,38 +85,35 @@ var datee = date.toLocaleString();
 							}
 						});
 					} else{
-						let sql = `INSERT INTO users (username,email,password,created_at,updated_at) VALUES ('${body.username}','${body.email}','${body.passwordhash}','${datee}','${datee}')`;
+						var queryInsertuser = pool.query(`INSERT INTO users ("roleId", "username", "email", "password", "createdAt", "updatedAt") VALUES (${body.roleid},'${body.username}','${body.email}','${body.passwordhash}','${body.createdat}','${body.updatedat}')`);
 
-						let query = conn.query(sql, (err, results) => {
-							if (err) {
-								res.send({
-									data:{
-										message:'ada yang error',
-										statuscode:500,
-										success:false,
-										error: err
-									}
-								});
-							} else{
-								res.send({
-									data:{
-										message: "data berhasil disimpan",
-										statuscode: 200,
-										success: true,
-									}
-								});
-							}
-						});
+						if (!queryInsertuser) {
+							res.send({
+								data:{
+									message:'gagal menyimpan data',
+									statuscode:500,
+									success:false,
+								}
+							});
+						} else{
+							res.send({
+								data:{
+									message:'sukses menyimpan data',
+									statuscode:200,
+									success:true,
+								}
+							});
+
+							console.log(querycheckuser.rows);
+						}
 					}
-				});
-
 		});
 
 		// login with jwt
 		app.post('/api/users/login', [
 			check('email').not().isEmpty().withMessage('Email wajib diisi'),
 			check('password').not().isEmpty().withMessage('password wajib diisi'),
-			],(req,res) => {
+			], async (req,res) => {
 				const errors = validationResult(req);
 				if (!errors.isEmpty()) {
 					return res.status(422).json({ errors: errors.array() });
@@ -107,48 +122,45 @@ var datee = date.toLocaleString();
 				var email 	 = req.body.email;
 				var password = req.body.password;
 
-				var d = new Date();
-				d.setDate(d.getDate() + 1);
-				console.log(d.toLocaleString());
+				var cekemail = await pool.query(`SELECT * FROM users WHERE email = '${email}'`);
+				if (cekemail.rows.length == 0) {
+					console.log('email tidak terdaftar');
+					res.send({
+						data:{
+							message:'email tidak terdaftar',
+							statuscode:500,
+							success:false,
+						}
+					});
+				} 
+				// console.log(cekemail.rows[0].password)
+				else{
+					var passworddecrypt = bcrypt.compareSync(password, cekemail.rows[0].password);
+					if (passworddecrypt) {
+						let token = jwt.sign({email: email, username: cekemail.rows[0].username},
+							config.secret,
+							{ expiresIn: '1y'}
+						);
 
-				var cekemail = `SELECT * FROM users WHERE email = '${email}'`;
-				let qr = conn.query(cekemail, (err, results) => {
-						if (results.length == 0) {
-							console.log('email tidak terdaftar');
-							res.json({
-								data:{
-									message: 'email tidak terdaftar',
-									success: false
+						res.json({
+							data:{
+								success: true,
+								message: 'Authentication successful!',
+								token: token,
+								user: {
+									email
 								}
-							})
-						} else{
-							var passworddecrypt = bcrypt.compareSync(password, results[0].password);
-							if (passworddecrypt) {
-								let token = jwt.sign({email: email, username: results[0].username},
-									config.secret,
-									{ expiresIn: '1s'}
-								);
-
-								res.json({
-									data:{
-										success: true,
-										message: 'Authentication successful!',
-										token: token,
-										user: {
-											email
-										}
-									}
-								});
-							}else {
-								res.json({
-									data:{
-										success: false,
-										message: 'Login gagal, email atau password salah',
-									}
-								});
 							}
+						});
+					}else {
+						res.json({
+							data:{
+								success: false,
+								message: 'Login gagal, email atau password salah',
+							}
+						});
 					}
-				});
+				}
 		});
 
 		// get user id
@@ -179,7 +191,7 @@ var datee = date.toLocaleString();
 		// get user id
 		app.get('/api/users/:id',(req, res) => {
 			let sql = "SELECT * FROM users WHERE id="+req.params.id;
-			let query = conn.query(sql, (err, results) => {
+			let query = queryDB.query(sql, (err, results) => {
 				if (results.length == 0) {
 					res.send({
 						message: "data tidak ditemukan",
@@ -200,11 +212,10 @@ var datee = date.toLocaleString();
 
 // ======================================== API PRODUCT ================================\\
 		//tampilkan semua data product
-		app.get('/api/products',(req, res) => {
-			let sql = "SELECT * FROM products";
+		app.get('/api/products', async (req, res) => {
+			let sql = await pool.query("SELECT * FROM products");
 
-			let query = conn.query(sql, (err, results) => {
-				if (results.length == 0) {
+				if (sql.rows.length == 0) {
 					res.send({
 						message: "data tidak ditemukan",
 						statuscode: 500,
@@ -215,17 +226,16 @@ var datee = date.toLocaleString();
 						message: "sukses menampilkan data",
 						statuscode: 200,
 						success: true,
-						data: results
+						data: sql.rows
 					})
 				}
-			});
 		});
 
 		//tampilkan data product berdasarkan id
-		app.get('/api/products/:id',(req, res) => {
-			let sql = "SELECT * FROM products WHERE id="+req.params.id;
-			let query = conn.query(sql, (err, results) => {
-				if (results.length == 0) {
+		app.get('/api/products/:id', async (req, res) => {
+			let sql = await pool.query(`SELECT * FROM products WHERE id="${req.params.id}"`);
+
+				if (sql.rows.length == 0) {
 					res.send({
 						message: "data tidak ditemukan",
 						statuscode: 500,
@@ -236,17 +246,16 @@ var datee = date.toLocaleString();
 						message: "sukses menampilkan data",
 						statuscode: 200,
 						success: true,
-						data: results
+						data: sql.rows
 					})
 				}
-			});
 		});
 
 		//Tambahkan data product baru
 		app.post('/api/products',[
 				check('nama').not().isEmpty().withMessage('Nama wajib diisi'),
 				check('price').not().isEmpty().withMessage('price wajib diisi'),
-				],(req, res) => {
+				], async (req, res) => {
 
 				const errors = validationResult(req);
 				if (!errors.isEmpty()) {
@@ -258,106 +267,95 @@ var datee = date.toLocaleString();
 
 				console.log(nama, price, datee);
 
-				let sql = `INSERT INTO products (nama,price,created_at,updated_at) VALUES ('${nama}','${price}','${datee}','${datee}')`;
+				let sql = await pool.query(`INSERT INTO products ("nama","price","createdAt","updatedAt") VALUES ('${nama}','${price}','${datee}','${datee}')`);
 
-				let query = conn.query(sql, (err, results) => {
-					if (err) {
-						res.send({
-							data:{
-								message:'ada yang error',
-								statuscode:500,
-								success:false,
-								error: err
-							}
-						});
-					} else{
-						res.send({
-							data:{
-								message: "data berhasil disimpan",
-								statuscode: 200,
-								success: true,
-							}
-						});
-					}
-				});
+				if (!sql) {
+					res.send({
+						data: {
+							message: "data gagal disimpan",
+							statuscode: 500,
+							success: false,
+						}
+					});
+				} else{
+					res.send({
+						data:{
+							message: "data berhasil disimpan",
+							statuscode: 200,
+							success: true,
+						}
+					})
+				}
 		});
 
 		//Edit data product berdasarkan id
 		app.put('/api/products/:id',[
 			check('nama').not().isEmpty().withMessage('Nama wajib diisi'),
 			check('price').not().isEmpty().withMessage('price wajib diisi'),
-			], (req, res) => {
+			], async (req, res) => {
 				const errors = validationResult(req);
 				if (!errors.isEmpty()) {
 					return res.status(422).json({ errors: errors.array() });
 				}
 
-				let sql = "SELECT * FROM products WHERE id="+req.params.id;
-				let query = conn.query(sql, (err, results) => {
-					if (results.length == 0) {
+				let sql = await pool.query(`SELECT * FROM products WHERE id = ${req.params.id}`);
+				if (sql.rows.length == 0) {
+					res.send({
+						message: "data tidak ditemukan",
+						statuscode: 500,
+						success: false,
+					});
+				} else{
+					let sql = pool.query(`UPDATE products SET "nama"='${req.body.nama}', "price"='${req.body.price}', "updatedAt"='${datee}' WHERE id = ${req.params.id}`);
+					if (!sql) {
 						res.send({
-							message: "data tidak ditemukan",
-							statuscode: 500,
-							success: false,
+							message:'ada yang error',
+							statuscode:500,
+							success:false,
+							error: err
 						});
 					} else{
-						let sql = "UPDATE products SET nama='"+req.body.nama+"', price='"+req.body.price+"', updated_at='"+datee+"' WHERE id="+req.params.id;
-						let query = conn.query(sql, (err, results) => {
-							if (err) {
-								res.send({
-									message:'ada yang error',
-									statuscode:500,
-									success:false,
-									error: err
-								});
-							} else{
-								res.send({
-									message: "data berhasil diupdate",
-									statuscode: 200,
-									success: true,
-								});
-							}
+						res.send({
+							message: "data berhasil diupdate",
+							statuscode: 200,
+							success: true,
 						});
 					}
-				});
+				}
 		});
 
 		//Delete data product berdasarkan id
-		app.delete('/api/products/:id',(req, res) => {
-			let sql = "SELECT * FROM products WHERE id="+req.params.id;
-				let query = conn.query(sql, (err, results) => {
-					if (results.length == 0) {
-						res.send({
-							data:{
-								message: "data tidak ditemukan",
-								statuscode: 500,
-								success: false,
-							}
-						});
-					} else{
-						let sql = "DELETE FROM products WHERE id="+req.params.id+"";
-						let query = conn.query(sql, (err, results) => {
-							if (err) {
-								res.send({
-									data:{
-										message:'ada yang error',
-										statuscode:500,
-										success:false,
-										error: err
-									}
-								});
-							} else{
-								res.send({
-									data:{
-										message: "data berhasil dihapus",
-										statuscode: 200,
-										success: true,
-									}
-								});
-							}
-						});
+		app.delete('/api/products/:id', async (req, res) => {
+			let sql = await pool.query(`SELECT * FROM products WHERE id = ${req.params.id}`);
+			if (sql.rows.length == 0) {
+				res.send({
+					data:{
+						message: "data tidak ditemukan",
+						statuscode: 500,
+						success: false,
 					}
 				});
+			} else{
+				let sql = pool.query(`DELETE FROM products WHERE id = ${req.params.id}`);
+				if (!sql) {
+					res.send({
+						data:{
+							message:'ada yang error',
+							statuscode:500,
+							success:false,
+							error: err
+						}
+					});
+				} else{
+					res.send({
+						data:{
+							message: "data berhasil dihapus",
+							statuscode: 200,
+							success: true,
+						}
+					});
+				}
+			}
 		});
 // ======================================== END API PRODUCT ================================\\
 

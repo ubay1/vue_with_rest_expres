@@ -13,9 +13,9 @@
                             </div>
                             <form action="" method="post" v-on:submit.prevent="onSubmit()">
                                 <div class="mb-3 mt-2">
-                                    <input type="text" class="form-control" name="username" id="username" placeholder="masukan username" v-model="form.username"> <br>
-                                    <input type="text" class="form-control" name="email" id="email" placeholder="masukan email" v-model="form.email"> <br>
-                                    <input type="password" class="form-control" name="password" id="password" placeholder="masukan password" v-model="form.password"> <br>
+                                    <input type="text" class="form-control" required="true" name="username" id="username" placeholder="masukan username" v-model="form.username"> <br>
+                                    <input type="text" class="form-control" required="true" name="email" id="email" placeholder="masukan email" v-model="form.email"> <br>
+                                    <input type="password" class="form-control" required="true" name="password" id="password" placeholder="masukan password" v-model="form.password"> <br>
 
                                     <button type="submit" :disabled="btnsubmit" class="btn btn-primary btn-daftar">Daftar <img v-show="showloader" :src="'static/assets/img/loader/loading_send.gif'" class="img_loader" alt=""></button>
                                 </div>
@@ -77,7 +77,7 @@
 
                 axios.post(process.env.ROOT_API+'users/register', formData)
                 .then(response => {
-										switch (response.data.data.success) {
+						switch (response.data.data.success) {
                         case false:
                             this.$refs.mytoast.Add({
                                 msg: 'Perhatian',
@@ -86,11 +86,9 @@
                                 timeout: 3500,
                                 position: 'toast-top-center',
                                 type: 'error'
-														});
-
-
-														this.showloader = !this.showloader;
-														this.btnsubmit = !this.btnsubmit;
+                            });
+                            this.showloader = !this.showloader;
+                            this.btnsubmit = !this.btnsubmit;
                             break;
 
                         case true:
@@ -101,14 +99,17 @@
                                 timeout: 3500,
                                 position: 'toast-top-center',
                                 type: 'success'
-														});
+							});
 
-														this.showloader = !this.showloader;
-														this.btnsubmit  = !this.btnsubmit;
-														this.form = '';
+                            this.showloader = !this.showloader;
+                            this.btnsubmit  = !this.btnsubmit;
+                            this.form = '';
                             break;
 
                         default:
+                            this.showloader = !this.showloader;
+                            this.btnsubmit  = !this.btnsubmit;
+                            this.form = '';
                             break;
                     }
                 })
